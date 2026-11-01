@@ -281,11 +281,17 @@ fn run_application() -> Result<(), Box<dyn Error>> {
 
         let pending = {
             let mut s = state.lock().unwrap();
-            s.pending.take()
+            let pending_reply = s.pending.take();
+            let pending_cq = s.pending_cq;
+            s.pending_cq = false;
+            (pending_reply, pending_cq)
         };
-        if let Some((call, rx_slot)) = pending {
+        if let (Some((call, rx_slot)), _) = pending {
             let rx_parity = slot::slot_parity_for_index(rx_slot);
             qso.start_manual_qso(call, rx_parity, rx_slot);
+        }
+        if let (_, true) = pending {
+            qso.start_manual_cq(slot::slot_parity_for_time(SystemTime::now(), slot::FT8_SLOT));
         }
 
         if let qso::Action::Transmit { text } = qso.next_action(parity) {
