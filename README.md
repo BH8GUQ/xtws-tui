@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.zh.md)
 
-XTWS-TUI is a Rust-based FT8/FT4 weak-signal digital mode terminal monitor. It listens to audio input, decodes digital mode signals, tracks worked callsigns and grids, and maintains runtime and QSO logs.
+XTWS-TUI is a Rust-based FT8/FT4 weak-signal digital mode terminal tools. It listens to audio input, decodes digital mode signals, tracks worked callsigns and grids, and maintains runtime and QSO logs.
 
 ## Features
 
