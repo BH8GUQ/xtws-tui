@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.zh.md)
 
-XTWS-TUI 是一个基于 Rust 的 FT8 / FT4 弱信号数字模式终端工具，运行于 TUI 界面中。可以实现多平台 FT8 / FT4 自动化通联。
+XTWS-TUI 是一个基于 Rust 的 FT8 / FT4 弱信号数字模式终端工具，运行于 TUI 界面中。它可以实现多平台 FT8 / FT4 自动化通联。
 
 ## 功能概览
 
