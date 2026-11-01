@@ -64,7 +64,7 @@ If you already have a built binary, you can also run it directly:
 
 ## Configuration
 
-The main configuration file is [config.toml](config.toml).
+The main configuration file is [config/config.toml](config/config.toml).
 
 ### Minimal configuration
 
@@ -126,7 +126,8 @@ protocol = "ft8"
 ├── README.zh.md
 ├── LICENSE
 ├── THIRD_PARTY_NOTICES.md
-├── config.toml
+├── config/
+│   └── config.toml
 ├── shell.nix
 ├── logs/
 ├── src/

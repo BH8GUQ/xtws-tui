@@ -70,7 +70,14 @@ pub fn main() {
 /// Runs the FT8 application loop: load config, initialize logs/audio, start the TUI,
 /// then keep processing slot-based decode and transmit cycles until shutdown.
 fn run_application() -> Result<(), Box<dyn Error>> {
-    let config = config::Config::load("config.toml")?;
+    let config_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("config")
+        .join("config.toml");
+    let config = config::Config::load(
+        config_path
+            .to_str()
+            .ok_or_else(|| format!("invalid config path: {}", config_path.display()))?,
+    )?;
     let audio_io = audio::AudioIo::new().map_err(|e| e.to_string())?;
 
     let mut run_log_store = run_log::RunLog::new(
