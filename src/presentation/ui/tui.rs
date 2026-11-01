@@ -49,6 +49,7 @@ pub struct UiState {
     pub visible_height: usize,
     pub my_call: String,
     pub pending: Option<(String, u64)>,
+    pub pending_cq: bool,
     pub render_gen: u64,
     pub rendered_gen: u64,
 }
@@ -68,6 +69,7 @@ impl UiState {
             visible_height: 0,
             my_call,
             pending: None,
+            pending_cq: false,
             render_gen: 0,
             rendered_gen: 0,
         }
@@ -201,15 +203,29 @@ impl UiState {
 }
 
 fn last_selectable(lines: &[UiLine]) -> Option<usize> {
-    (0..lines.len()).rev().find(|&i| lines[i].selectable)
+    lines
+        .iter()
+        .enumerate()
+        .rev()
+        .find(|(_, line)| line.selectable)
+        .map(|(index, _)| index)
 }
 
 fn prev_selectable(lines: &[UiLine], from: usize) -> Option<usize> {
-    (0..from).rev().find(|&i| lines[i].selectable)
+    lines[..from]
+        .iter()
+        .enumerate()
+        .rev()
+        .find(|(_, line)| line.selectable)
+        .map(|(index, _)| index)
 }
 
 fn next_selectable(lines: &[UiLine], from: usize) -> Option<usize> {
-    ((from + 1)..lines.len()).find(|&i| lines[i].selectable)
+    lines[(from + 1)..]
+        .iter()
+        .enumerate()
+        .find(|(_, line)| line.selectable)
+        .map(|(offset, _)| from + 1 + offset)
 }
 
 fn left_at_bottom(s: &UiState) -> bool {
@@ -294,6 +310,7 @@ pub fn run_tui(
                         s.should_quit = true;
                         shutdown.store(true, Ordering::Relaxed);
                     }
+                    KeyCode::Char('c') | KeyCode::Char('d') => s.pending_cq = true,
                     KeyCode::Left => s.focus = Focus::Left,
                     KeyCode::Right => s.focus = Focus::Right,
                     KeyCode::Up => s.move_up(),
@@ -389,7 +406,7 @@ fn render_pane(
             } else if let Some(ref tag) = line.tag {
                 match color_from_key(tag.color_key, config) {
                     Some(c) => Style::default().fg(c),
-                    None => Style::default(),
+                    _ => Style::default(),
                 }
             } else {
                 Style::default()

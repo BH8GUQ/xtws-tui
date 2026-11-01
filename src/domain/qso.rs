@@ -7,7 +7,7 @@ use mfsk_core::msg::decoded::Decoded;
 use std::collections::{HashSet, VecDeque};
 
 /// A next-step instruction for the runtime loop.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     /// Wait for the next receive window.
     Receive,
@@ -125,6 +125,16 @@ impl QsoStateMachine {
         self.tx_parity = Some(!rx_parity);
         self.retries = 0;
         self.start_slot = rx_slot;
+    }
+
+    /// Starts a manual CQ burst for the next transmit slot relative to the current parity.
+    pub fn start_manual_cq(&mut self, current_slot_parity: bool) {
+        self.state = QsoState::CqSent;
+        self.target = None;
+        self.tx_parity = Some(!current_slot_parity);
+        self.retries = 0;
+        self.idle_slots = 0;
+        self.start_slot = 0;
     }
 
     fn reset(&mut self) {
@@ -391,4 +401,29 @@ fn parse_me_other_with(text: &str, my_call: &str, token: &str) -> Option<String>
         return None;
     }
     Some(p[1].to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manual_cq_schedules_tx_for_next_slot() {
+        let mut qso = QsoStateMachine::new(
+            "JA1ABC".to_string(),
+            "PM95".to_string(),
+            3,
+            1,
+            false,
+            false,
+            0,
+            HashSet::new(),
+        );
+
+        qso.start_manual_cq(false);
+
+        assert_eq!(qso.state_name(), "CQ");
+        assert!(matches!(qso.next_action(true), Action::Transmit { text } if text == "CQ JA1ABC PM95"));
+        assert_eq!(qso.next_action(false), Action::Receive);
+    }
 }
