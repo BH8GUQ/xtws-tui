@@ -66,7 +66,7 @@ cargo run --release
 
 ## 配置说明
 
-主配置文件位于 [config/config.toml](config/config.toml)。
+主配置文件位于 [config/config.toml](./config/config.toml)。
 
 ### 最小配置
 
