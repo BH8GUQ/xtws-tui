@@ -78,6 +78,12 @@ fn run_application() -> Result<(), Box<dyn Error>> {
             .to_str()
             .ok_or_else(|| format!("invalid config path: {}", config_path.display()))?,
     )?;
+
+    // Create `config/dxcc.txt` on first run, then load it into the global table.
+    if let Err(e) = domain::dxcc::init_default() {
+        eprintln!("warning: dxcc table not loaded: {e}");
+    }
+
     let audio_io = audio::AudioIo::new().map_err(|e| e.to_string())?;
 
     let mut run_log_store = run_log::RunLog::new(
@@ -125,9 +131,13 @@ fn run_application() -> Result<(), Box<dyn Error>> {
         config.qso.max_retries,
         config.qso.auto_cq_attempts,
         config.qso.auto_reply_cq,
+        config.qso.auto_reply_new_grid,
+        config.qso.auto_reply_new_dxcc,
         config.qso.reply_b4,
         config.qso.idle_slots_before_cq,
         worked_set.clone(),
+        worked_grids.clone(),
+        worked_dxcc.clone(),
     );
 
     if let Some(ref manual) = config.test.manual_tx {
@@ -164,9 +174,11 @@ fn run_application() -> Result<(), Box<dyn Error>> {
 
     let mut left_lines: VecDeque<(String, Option<ui::feed::DecodeTag>, Option<u64>)> =
         VecDeque::new();
-    let mut right_lines: VecDeque<(String, Option<u64>)> = VecDeque::new();
+    let mut right_lines: VecDeque<(String, Option<ui::feed::DecodeTag>, Option<u64>)> =
+        VecDeque::new();
     let mut last_left_slot: Option<u64> = None;
     let mut last_right_slot: Option<u64> = None;
+    let mut last_sm_cq = false;
 
     if !wait_until_next_slot_boundary(slot::FT8_SLOT, &shutdown) {
         let _ = ui_thread.join();
@@ -200,6 +212,7 @@ fn run_application() -> Result<(), Box<dyn Error>> {
         if pcm.len() >= expected_len / 2 {
             let results = decode::decode_ft8_slot(&mut decoder, &pcm);
             qso.on_decode(&results, prev_parity, prev_index);
+            sync_cq_to_ui(&state, qso.is_manual_cq_active(), &mut last_sm_cq);
 
             if !results.is_empty() {
                 let mut divider_added = false;
@@ -211,6 +224,7 @@ fn run_application() -> Result<(), Box<dyn Error>> {
                 if !to_me.is_empty() && last_right_slot != Some(prev_index) {
                     right_lines.push_back((
                         ui::feed::format_divider_line(prev_index, freq_mhz, &mode_for_ui),
+                        None,
                         None,
                     ));
                     while right_lines.len() > mem_lines {
@@ -231,7 +245,7 @@ fn run_application() -> Result<(), Box<dyn Error>> {
                         &worked_set,
                         &worked_grids,
                         &worked_dxcc,
-                        qso.target_call(),
+                        qso.working_target_call(),
                     );
 
                     let is_worked = tag
@@ -261,6 +275,7 @@ fn run_application() -> Result<(), Box<dyn Error>> {
                     if ui::feed::is_message_addressed_to_me(&d.text, &my_call) {
                         right_lines.push_back((
                             ui::feed::format_decode_line(prev_index, d),
+                            Some(ui::feed::to_me_tag()),
                             Some(prev_index),
                         ));
                         while right_lines.len() > mem_lines {
@@ -282,17 +297,22 @@ fn run_application() -> Result<(), Box<dyn Error>> {
         let pending = {
             let mut s = state.lock().unwrap();
             let pending_reply = s.pending.take();
-            let pending_cq = s.pending_cq;
-            s.pending_cq = false;
-            (pending_reply, pending_cq)
+            let desired_cq = s.pending_cq;
+            (pending_reply, desired_cq)
         };
+        let mut cq_intent = pending.1;
         if let (Some((call, rx_slot)), _) = pending {
             let rx_parity = slot::slot_parity_for_index(rx_slot);
             qso.start_manual_qso(call, rx_parity, rx_slot);
+            cq_intent = false;
         }
-        if let (_, true) = pending {
-            qso.start_manual_cq(slot::slot_parity_for_time(SystemTime::now(), slot::FT8_SLOT));
+        let manual_cq_slot_parity = config.qso.cq_slot == 1;
+        if cq_intent && !qso.is_manual_cq_active() {
+            qso.start_manual_cq(manual_cq_slot_parity);
+        } else if !cq_intent && qso.is_manual_cq_active() {
+            qso.stop_manual_cq();
         }
+        sync_cq_to_ui(&state, qso.is_manual_cq_active(), &mut last_sm_cq);
 
         if let qso::Action::Transmit { text } = qso.next_action(parity) {
             let _ = capture.take();
@@ -335,20 +355,31 @@ fn run_application() -> Result<(), Box<dyn Error>> {
             }
             worked_set.insert(done.call.clone());
             if let Some(d) = ui::feed::dxcc_prefix_for_call(&done.call) {
-                worked_dxcc.insert(d);
+                worked_dxcc.insert(d.clone());
+                qso.insert_worked_dxcc(d);
             }
             if let Some(ref g) = done.grid {
                 worked_grids.insert(g.clone());
+                qso.insert_worked_grid(g.clone());
                 if let Err(e) = worked_grids_log.insert(g) {
                     eprintln!("worked grids log write failed: {e}");
                 }
             }
         }
+
+        sync_cq_to_ui(&state, qso.is_manual_cq_active(), &mut last_sm_cq);
     }
 
     drop(capture);
     let _ = ui_thread.join();
     Ok(())
+}
+
+fn sync_cq_to_ui(state: &Arc<Mutex<ui::tui::UiState>>, active: bool, last: &mut bool) {
+    if active != *last {
+        state.lock().unwrap().pending_cq = active;
+        *last = active;
+    }
 }
 
 /// Waits for the UI render generation to catch up with the newest state update.
@@ -402,7 +433,7 @@ fn record_transmit_line(
     freq_hz: f32,
     text: &str,
     run_log: &mut run_log::RunLog,
-    right_lines: &mut VecDeque<(String, Option<u64>)>,
+    right_lines: &mut VecDeque<(String, Option<ui::feed::DecodeTag>, Option<u64>)>,
     last_right_slot: &mut Option<u64>,
     state: &Arc<Mutex<ui::tui::UiState>>,
     freq_mhz: f64,
@@ -410,13 +441,21 @@ fn record_transmit_line(
     mem_lines: usize,
 ) {
     if *last_right_slot != Some(index) {
-        right_lines.push_back((ui::feed::format_divider_line(index, freq_mhz, mode), None));
+        right_lines.push_back((
+            ui::feed::format_divider_line(index, freq_mhz, mode),
+            None,
+            None,
+        ));
         while right_lines.len() > mem_lines {
             right_lines.pop_front();
         }
         *last_right_slot = Some(index);
     }
-    right_lines.push_back((ui::feed::format_tx_line(index, freq_hz, text), Some(index)));
+    right_lines.push_back((
+        ui::feed::format_tx_line(index, freq_hz, text),
+        None,
+        Some(index),
+    ));
     while right_lines.len() > mem_lines {
         right_lines.pop_front();
     }

@@ -102,12 +102,7 @@ pub fn slot_to_adif_dt(slot: u64) -> (String, String) {
     let rem = secs % 86_400;
     let (y, m, d) = civil_from_days(days as i64);
     let date = format!("{:04}{:02}{:02}", y, m, d);
-    let time = format!(
-        "{:02}{:02}{:02}",
-        rem / 3600,
-        (rem % 3600) / 60,
-        rem % 60
-    );
+    let time = format!("{:02}{:02}{:02}", rem / 3600, (rem % 3600) / 60, rem % 60);
     (date, time)
 }
 

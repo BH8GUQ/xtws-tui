@@ -13,6 +13,8 @@ XTWS-TUI is a Rust-based FT8/FT4 weak-signal digital mode terminal monitor. It l
 - Runtime logs and ADIF QSO log output
 - Configurable UI colors, sample rate, log directories, and frequency settings
 
+![Demonstration Picture](images/demonstration.png)
+
 ## Requirements
 
 On Linux, the project typically expects:
@@ -184,7 +186,7 @@ The program writes logs to the following locations:
 Common TUI controls:
 
 - `q`: quit the application
-- `d`: queue a CQ transmission for the next slot
+- `d`: start CQ
 - `↑ / ↓`: move up or down in the panel
 - `← / →`: switch focus between left and right panes
 - `Enter`: initiate or respond to a selected item

@@ -33,7 +33,12 @@ impl RunLog {
         Ok(log)
     }
 
-    pub fn append_decode(&mut self, slot_index: u64, parity: bool, d: &Decoded) -> std::io::Result<()> {
+    pub fn append_decode(
+        &mut self,
+        slot_index: u64,
+        parity: bool,
+        d: &Decoded,
+    ) -> std::io::Result<()> {
         let body = format!(
             "RX {:7.1}Hz dt={:+.2}s SNR={:+.0}dB {}",
             d.freq_hz, d.dt_sec, d.snr_db, d.text
@@ -48,10 +53,19 @@ impl RunLog {
         freq_hz: f32,
         text: &str,
     ) -> std::io::Result<()> {
-        self.push(slot_index, parity, &format!("TX {:7.1}Hz {}", freq_hz, text))
+        self.push(
+            slot_index,
+            parity,
+            &format!("TX {:7.1}Hz {}", freq_hz, text),
+        )
     }
 
-    pub fn append_event(&mut self, slot_index: u64, kind: &str, detail: &str) -> std::io::Result<()> {
+    pub fn append_event(
+        &mut self,
+        slot_index: u64,
+        kind: &str,
+        detail: &str,
+    ) -> std::io::Result<()> {
         self.push(slot_index, false, &format!("EVT {} {}", kind, detail))
     }
 
@@ -132,7 +146,10 @@ fn slot_time_utc(slot_index: u64) -> String {
     let hh = rem / 3600;
     let mm = (rem % 3600) / 60;
     let ss = rem % 60;
-    format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC", y, m, d, hh, mm, ss)
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02} UTC",
+        y, m, d, hh, mm, ss
+    )
 }
 
 fn civil_from_days(z: i64) -> (i64, u32, u32) {

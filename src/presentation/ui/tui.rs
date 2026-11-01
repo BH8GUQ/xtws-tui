@@ -6,15 +6,15 @@
 use crossterm::{
     event::{self, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Terminal,
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
-    Terminal,
 };
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,6 +22,11 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 
 use super::feed::{ColorKey, DecodeTag, UiFeed};
+
+/// Minimum terminal width before the "too small" overlay takes over the screen.
+const MIN_TERMINAL_WIDTH: u16 = 110;
+/// Minimum terminal height before the "too small" overlay takes over the screen.
+const MIN_TERMINAL_HEIGHT: u16 = 20;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum Focus {
@@ -102,16 +107,16 @@ impl UiState {
         self.render_gen += 1;
     }
 
-    pub fn set_right_lines(&mut self, raw: Vec<(String, Option<u64>)>) {
+    pub fn set_right_lines(&mut self, raw: Vec<(String, Option<DecodeTag>, Option<u64>)>) {
         let was_bottom = right_at_bottom(self);
         self.right_lines = raw
             .into_iter()
-            .map(|(text, slot_index)| {
+            .map(|(text, tag, slot_index)| {
                 let selectable = !text.starts_with("---");
                 UiLine {
                     text,
                     selectable,
-                    tag: None,
+                    tag,
                     slot_index,
                 }
             })
@@ -152,8 +157,16 @@ impl UiState {
 
     fn move_up(&mut self) {
         match self.focus {
-            Focus::Left => move_up_in(&self.left_lines, &mut self.left_cursor, &mut self.left_scroll),
-            Focus::Right => move_up_in(&self.right_lines, &mut self.right_cursor, &mut self.right_scroll),
+            Focus::Left => move_up_in(
+                &self.left_lines,
+                &mut self.left_cursor,
+                &mut self.left_scroll,
+            ),
+            Focus::Right => move_up_in(
+                &self.right_lines,
+                &mut self.right_cursor,
+                &mut self.right_scroll,
+            ),
         }
     }
 
@@ -299,14 +312,18 @@ pub fn run_tui(
 
     loop {
         let size = terminal.size()?;
-        let visible = size.height.saturating_sub(1) as usize;
+        let too_small = size.width < MIN_TERMINAL_WIDTH || size.height < MIN_TERMINAL_HEIGHT;
         {
             let mut s = state.lock().unwrap();
-            s.header = feed.header(SystemTime::now());
-            s.visible_height = visible;
-            s.ensure_cursor_visible();
-            terminal.draw(|f| draw(f, &s, &config))?;
-            s.rendered_gen = s.render_gen;
+            if too_small {
+                terminal.draw(|f| draw_too_small(f))?;
+            } else {
+                s.header = feed.header(SystemTime::now());
+                s.visible_height = size.height.saturating_sub(1) as usize;
+                s.ensure_cursor_visible();
+                terminal.draw(|f| draw(f, &s, &config, s.pending_cq))?;
+                s.rendered_gen = s.render_gen;
+            }
             if s.should_quit {
                 break;
             }
@@ -320,7 +337,8 @@ pub fn run_tui(
                         s.should_quit = true;
                         shutdown.store(true, Ordering::Relaxed);
                     }
-                    KeyCode::Char('d') => s.pending_cq = true,
+                    _ if too_small => {}
+                    KeyCode::Char('d') => s.pending_cq = !s.pending_cq,
                     KeyCode::Left => s.focus = Focus::Left,
                     KeyCode::Right => s.focus = Focus::Right,
                     KeyCode::Up => s.move_up(),
@@ -338,15 +356,61 @@ pub fn run_tui(
     Ok(())
 }
 
-fn draw(f: &mut ratatui::Frame, s: &UiState, config: &crate::config::UiConfig) {
+/// Renders a centered notice when the terminal is smaller than the minimum size.
+fn draw_too_small(f: &mut ratatui::Frame) {
+    let area = f.area();
+    let text = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "Terminal too small",
+            Style::default()
+                .fg(Color::LightRed)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(format!("Current: {}x{}", area.width, area.height)),
+        Line::from(format!(
+            "Required: {}x{}",
+            MIN_TERMINAL_WIDTH, MIN_TERMINAL_HEIGHT
+        )),
+        Line::from(""),
+        Line::from("Resize the terminal to continue, or press q to quit"),
+    ];
+    let text_height = text.len() as u16;
+    let y = area.y + area.height.saturating_sub(text_height) / 2;
+    let rect = Rect {
+        x: area.x,
+        y,
+        width: area.width,
+        height: text_height.min(area.height),
+    };
+    f.render_widget(
+        Paragraph::new(text).alignment(Alignment::Center),
+        rect,
+    );
+}
+
+fn draw(f: &mut ratatui::Frame, s: &UiState, config: &crate::config::UiConfig, cq_enabled: bool) {
     let area = f.area();
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Min(0)])
         .split(area);
 
+    let cq_label = if cq_enabled { "CQ ON" } else { "CQ OFF" };
+    let cq_style = if cq_enabled {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default().fg(Color::Red)
+    };
+
+    let header_line = Line::from(vec![
+        Span::raw(s.header.as_str()),
+        Span::styled(format!(" {:>9}", cq_label), cq_style),
+    ]);
+
     f.render_widget(
-        Paragraph::new(s.header.as_str()).style(Style::default().fg(Color::Cyan)),
+        Paragraph::new(header_line).style(Style::default().fg(Color::Cyan)),
         chunks[0],
     );
 
@@ -400,34 +464,43 @@ fn render_pane(
             let selected = focused && abs == cursor && line.selectable;
 
             let mut text = line.text.clone();
-            if let Some(ref tag) = line.tag {
-                if !tag.label.is_empty() {
-                    let cur_len = text.chars().count();
-                    let label_len = tag.label.chars().count();
-                    let pad = width.saturating_sub(cur_len + label_len + 1);
-                    text.push_str(&" ".repeat(pad));
-                    text.push(' ');
-                    text.push_str(&tag.label);
-                }
+            let label = line.tag.as_ref().map(|t| t.label.as_str()).unwrap_or("");
+            let label_len = label.chars().count();
+            let arrow = if selected { "   <(--)" } else { "" };
+            let arrow_len = arrow.chars().count();
+
+            // Reserve room for the cursor, the tag, and the tag's leading space.
+            let reserved = arrow_len + label_len + if label_len > 0 { 1 } else { 0 };
+            let max_text_len = width.saturating_sub(reserved).max(1);
+            if text.chars().count() > max_text_len {
+                text = text.chars().take(max_text_len).collect();
             }
 
             let text_style = if !line.selectable {
                 Style::default().fg(Color::DarkGray)
             } else if let Some(ref tag) = line.tag {
-                match color_from_key(tag.color_key, config) {
-                    Some(c) => Style::default().fg(c),
-                    _ => Style::default(),
-                }
+                color_from_key(tag.color_key, config)
+                    .map(|c| Style::default().fg(c))
+                    .unwrap_or_default()
             } else {
                 Style::default()
             };
 
-            let mut spans = vec![Span::styled(text, text_style)];
-            if selected {
+            // Order: text -> cursor -> padding -> tag.
+            let mut spans = vec![Span::styled(text.clone(), text_style)];
+            if !arrow.is_empty() {
                 spans.push(Span::styled(
-                    "   <(--)",
+                    arrow.to_string(),
                     Style::default().fg(Color::Rgb(255, 165, 0)),
                 ));
+            }
+            if !label.is_empty() {
+                let used = text.chars().count() + arrow_len + label_len + 1;
+                let pad = width.saturating_sub(used);
+                if pad > 0 {
+                    spans.push(Span::raw(" ".repeat(pad)));
+                }
+                spans.push(Span::styled(format!(" {}", label), text_style));
             }
 
             ListItem::new(Line::from(spans))
@@ -452,6 +525,7 @@ fn color_from_key(key: ColorKey, config: &crate::config::UiConfig) -> Option<Col
         ColorKey::NewDxcc => &config.color_new_dxcc,
         ColorKey::Working => &config.color_working,
         ColorKey::Worked => &config.color_worked,
+        ColorKey::RxToMe => &config.color_rx_to_me,
     };
     parse_color_name(name)
 }
@@ -482,13 +556,28 @@ fn parse_color_name(s: &str) -> Option<Color> {
 
 #[cfg(test)]
 mod tests {
-    use super::{next_selectable, prev_selectable, UiLine};
+    use super::{UiLine, next_selectable, prev_selectable};
 
     fn make_lines() -> Vec<UiLine> {
         vec![
-            UiLine { text: "one".to_string(), selectable: true, tag: None, slot_index: None },
-            UiLine { text: "two".to_string(), selectable: false, tag: None, slot_index: None },
-            UiLine { text: "three".to_string(), selectable: true, tag: None, slot_index: None },
+            UiLine {
+                text: "one".to_string(),
+                selectable: true,
+                tag: None,
+                slot_index: None,
+            },
+            UiLine {
+                text: "two".to_string(),
+                selectable: false,
+                tag: None,
+                slot_index: None,
+            },
+            UiLine {
+                text: "three".to_string(),
+                selectable: true,
+                tag: None,
+                slot_index: None,
+            },
         ]
     }
 
