@@ -24,6 +24,7 @@ color_worked = "gray"
 auto_reply_cq = true
 reply_b4 = false
 max_retries = 5
+cq_slot = 0
 idle_slots_before_cq = 0
 auto_cq_max_retries = 10
 

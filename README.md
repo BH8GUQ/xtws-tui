@@ -184,7 +184,7 @@ The program writes logs to the following locations:
 Common TUI controls:
 
 - `q`: quit the application
-- `c` / `d`: queue a CQ transmission for the next slot
+- `d`: queue a CQ transmission for the next slot
 - `↑ / ↓`: move up or down in the panel
 - `← / →`: switch focus between left and right panes
 - `Enter`: initiate or respond to a selected item

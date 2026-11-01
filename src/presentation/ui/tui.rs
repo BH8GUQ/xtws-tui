@@ -212,7 +212,12 @@ fn last_selectable(lines: &[UiLine]) -> Option<usize> {
 }
 
 fn prev_selectable(lines: &[UiLine], from: usize) -> Option<usize> {
-    lines[..from]
+    let end = from.min(lines.len());
+    if end == 0 {
+        return None;
+    }
+
+    lines[..end]
         .iter()
         .enumerate()
         .rev()
@@ -221,11 +226,16 @@ fn prev_selectable(lines: &[UiLine], from: usize) -> Option<usize> {
 }
 
 fn next_selectable(lines: &[UiLine], from: usize) -> Option<usize> {
-    lines[(from + 1)..]
+    let start = from.saturating_add(1).min(lines.len());
+    if start >= lines.len() {
+        return None;
+    }
+
+    lines[start..]
         .iter()
         .enumerate()
         .find(|(_, line)| line.selectable)
-        .map(|(offset, _)| from + 1 + offset)
+        .map(|(offset, _)| start + offset)
 }
 
 fn left_at_bottom(s: &UiState) -> bool {
@@ -310,7 +320,7 @@ pub fn run_tui(
                         s.should_quit = true;
                         shutdown.store(true, Ordering::Relaxed);
                     }
-                    KeyCode::Char('c') | KeyCode::Char('d') => s.pending_cq = true,
+                    KeyCode::Char('d') => s.pending_cq = true,
                     KeyCode::Left => s.focus = Focus::Left,
                     KeyCode::Right => s.focus = Focus::Right,
                     KeyCode::Up => s.move_up(),
@@ -468,4 +478,29 @@ fn parse_color_name(s: &str) -> Option<Color> {
         "orange" => Color::Rgb(255, 165, 0),
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{next_selectable, prev_selectable, UiLine};
+
+    fn make_lines() -> Vec<UiLine> {
+        vec![
+            UiLine { text: "one".to_string(), selectable: true, tag: None, slot_index: None },
+            UiLine { text: "two".to_string(), selectable: false, tag: None, slot_index: None },
+            UiLine { text: "three".to_string(), selectable: true, tag: None, slot_index: None },
+        ]
+    }
+
+    #[test]
+    fn prev_selectable_handles_cursor_at_end() {
+        let lines = make_lines();
+        assert_eq!(prev_selectable(&lines, lines.len()), Some(2));
+    }
+
+    #[test]
+    fn next_selectable_handles_cursor_at_end() {
+        let lines = make_lines();
+        assert_eq!(next_selectable(&lines, lines.len() - 1), None);
+    }
 }
