@@ -1,0 +1,10 @@
+target/
+logs/
+*.log
+*.tmp
+*.swp
+*.swo
+.DS_Store
+.vscode/
+.idea/
+shell.nix
