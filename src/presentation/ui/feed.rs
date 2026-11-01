@@ -19,6 +19,7 @@ pub enum ColorKey {
     NewDxcc,
     Working,
     Worked,
+    RxToMe,
 }
 
 #[derive(Clone)]
@@ -42,13 +43,21 @@ impl UiFeed {
         let secs = now.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
         let rem = secs % 86_400;
         format!(
-            "{:02}:{:02}:{:02} UTC | {} {} | q quit  ↑↓ select  ←→ pane  Enter reply",
+            "{:02}:{:02}:{:02} UTC | {} {} | q quit  d start CQ  ↑↓ select  ←→ pane  Enter reply",
             rem / 3600,
             (rem % 3600) / 60,
             rem % 60,
             self.band(),
             self.mode
         )
+    }
+}
+
+/// Tag for a message addressed to the local station shown in the right pane.
+pub fn to_me_tag() -> DecodeTag {
+    DecodeTag {
+        label: String::new(),
+        color_key: ColorKey::RxToMe,
     }
 }
 
@@ -101,6 +110,8 @@ pub fn format_slot_hms(slot_index: u64) -> String {
 }
 
 /// Returns true when a decoded transmission is directed at the current station.
+///
+/// FT8 messages carry `TO FROM CONTENT`, so the addressee is the first field.
 pub fn is_message_addressed_to_me(text: &str, my_call: &str) -> bool {
     let p: Vec<&str> = text.split_whitespace().collect();
     if p.len() < 2 {
@@ -109,7 +120,7 @@ pub fn is_message_addressed_to_me(text: &str, my_call: &str) -> bool {
     if p[0] == "CQ" {
         return false;
     }
-    p[1] == my_call
+    p[0] == my_call
 }
 
 /// Extracts the remote call sign from a decoded line so the user can reply to it.
@@ -119,9 +130,7 @@ pub fn extract_reply_call_from_line(line: &str, my_call: &str) -> Option<String>
     if p.len() < 2 {
         return None;
     }
-    if p[0] == my_call {
-        return None;
-    }
+    // Skip our own outbound messages, where the sender sits in the second field.
     if p[1] == my_call {
         return None;
     }
@@ -212,23 +221,11 @@ fn is_maidenhead_grid(s: &str) -> bool {
         && b[3].is_ascii_digit()
 }
 
-/// Extracts the DXCC-style prefix from a callsign for worked-country tracking.
+/// Returns the DXCC entity name for `call` via the loaded prefix table.
+///
+/// Falls back to `None` when the table is not initialized or no prefix matches.
 pub fn dxcc_prefix_for_call(call: &str) -> Option<String> {
-    let base = call.split('/').next()?;
-    let mut prefix = String::new();
-    for ch in base.chars() {
-        if ch.is_ascii_alphabetic() || ch.is_ascii_digit() {
-            prefix.push(ch);
-        }
-        if ch.is_ascii_digit() {
-            break;
-        }
-    }
-    if prefix.is_empty() {
-        None
-    } else {
-        Some(prefix)
-    }
+    crate::domain::dxcc::entity_for_call(call)
 }
 
 /// Maps a frequency in MHz to the corresponding amateur radio band label.

@@ -196,6 +196,8 @@ pub struct UiConfig {
     pub color_working: String,
     #[serde(default = "default_ui_color_worked")]
     pub color_worked: String,
+    #[serde(default = "default_ui_color_rx_to_me")]
+    pub color_rx_to_me: String,
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -208,12 +210,18 @@ pub struct QsoConfig {
     #[serde(default)]
     pub auto_reply_cq: bool,
     #[serde(default)]
+    pub auto_reply_new_grid: bool,
+    #[serde(default)]
+    pub auto_reply_new_dxcc: bool,
+    #[serde(default)]
     pub reply_b4: bool,
+    #[serde(default = "default_cq_slot")]
+    pub cq_slot: u8,
     #[serde(default = "default_max_retries")]
     pub max_retries: u32,
     #[serde(default = "default_idle_slots_before_cq")]
     pub idle_slots_before_cq: u32,
-    #[serde(default = "default_auto_cq_attempts")]
+    #[serde(default = "default_auto_cq_attempts", alias = "cq_max_retries")]
     pub auto_cq_attempts: u32,
 }
 
@@ -327,6 +335,7 @@ impl Default for UiConfig {
             color_new_dxcc: default_ui_color_new_dxcc(),
             color_working: default_ui_color_working(),
             color_worked: default_ui_color_worked(),
+            color_rx_to_me: default_ui_color_rx_to_me(),
         }
     }
 }
@@ -335,7 +344,10 @@ impl Default for QsoConfig {
     fn default() -> Self {
         Self {
             auto_reply_cq: false,
+            auto_reply_new_grid: false,
+            auto_reply_new_dxcc: false,
             reply_b4: false,
+            cq_slot: default_cq_slot(),
             max_retries: default_max_retries(),
             idle_slots_before_cq: default_idle_slots_before_cq(),
             auto_cq_attempts: default_auto_cq_attempts(),
@@ -420,6 +432,12 @@ fn default_ui_color_working() -> String {
 }
 fn default_ui_color_worked() -> String {
     "gray".into()
+}
+fn default_ui_color_rx_to_me() -> String {
+    "darkgray".into()
+}
+fn default_cq_slot() -> u8 {
+    0
 }
 fn default_max_retries() -> u32 {
     5
@@ -526,11 +544,15 @@ impl Config {
         parse_color(&self.ui.color_new_dxcc)?;
         parse_color(&self.ui.color_working)?;
         parse_color(&self.ui.color_worked)?;
+        parse_color(&self.ui.color_rx_to_me)?;
         if let Some(ref s) = self.test.manual_tx {
             let parts: Vec<&str> = s.split_whitespace().collect();
             if parts.len() != 3 || parts[0] != "CQ" {
                 return Err("test.manual_tx must be 'CQ CALL GRID'".into());
             }
+        }
+        if self.qso.cq_slot > 1 {
+            return Err("qso.cq_slot must be 0 or 1".into());
         }
         if self.qso.max_retries == 0 {
             return Err("qso.max_retries must be > 0".into());

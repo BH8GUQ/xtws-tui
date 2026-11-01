@@ -1,62 +1,122 @@
+# XTWS-TUI configuration
+# All keys are listed with their defaults so the file doubles as a reference.
+# Remove or comment out any line to fall back to the built-in default.
+
 [user]
+# Station callsign used for TX and logging (required).
 call = "ID1OT"
+# Maidenhead grid square (required).
 grid = "PM95"
+# Operating frequency in MHz (required, > 0).
 freq_mhz = 21.074
 
+[device.audio]
+# Optional input device name for the capture stream.
+# Leave unset to use the system default input device.
+# input = "alsa_input.usb-..."
+# Optional output device name for TX audio playback.
+# Leave unset to use the system default output device.
+# output = "alsa_output.usb-..."
+
 [device.radio]
+# Full-duplex flag. Currently informational only.
 duplex = false
+# Protocol name. Supported values: "ft8", "ft4" (case-insensitive).
 protocol = "ft8"
 
-[ui]
-refresh_ms = 100
-left_percent = 55
-show_rx = true
-show_tx = true
-show_evt = false
-hide_worked = false
-color_new_call = "green"
-color_new_grid = "purple"
-color_new_dxcc = "red"
-color_working = "orange"
-color_worked = "gray"
-
-[qso]
-auto_reply_cq = true
-reply_b4 = false
-max_retries = 5
-idle_slots_before_cq = 0
-auto_cq_max_retries = 10
-
-[log.run]
-dir = "logs/run"
-keep_days = 30
-mem_lines = 1000
-
-[log.qso]
-dir = "logs/qso"
-keep_days = 3650
-
-[log.worked]
-calls_path = "logs/worked_calls.txt"
-grids_path = "logs/worked_grids.txt"
-
 [build.ft8]
+# TX sample rate in Hz.
 sample_rate = 12000
+# TX audio offset within the passband, in Hz.
 tx_freq = 1500.0
+# TX amplitude (i16 peak).
 tx_amp = 20000
+# Silence padding before the FT8 frame starts, in seconds.
+# Must be in [0, 15).
 start_offset = 0.5
 
 [build.ft4]
 sample_rate = 12000
 tx_freq = 1500.0
 tx_amp = 20000
+# Must be in [0, 7.5).
 start_offset = 0.5
 
 [decode.ft8]
+# Lower edge of the decoded audio range, in Hz.
 freq_min = 100.0
+# Upper edge of the decoded audio range, in Hz.
 freq_max = 3000.0
 
 [decode.ft4]
 freq_min = 100.0
 freq_max = 3000.0
 
+[log.run]
+# Directory for per-day runtime logs.
+dir = "logs/run"
+# How many days of runtime logs to keep.
+keep_days = 30
+# In-memory line buffer size for the UI.
+mem_lines = 1000
+
+[log.qso]
+# Directory for per-day ADIF QSO logs.
+dir = "logs/qso"
+# How many days of QSO logs to keep.
+keep_days = 3650
+
+[log.worked]
+# File that stores worked callsigns.
+calls_path = "logs/worked_calls.txt"
+# File that stores worked Maidenhead grids.
+grids_path = "logs/worked_grids.txt"
+
+[ui]
+# UI refresh interval in milliseconds.
+refresh_ms = 100
+# Width percentage of the left pane (1..99).
+left_percent = 55
+# Show the RX column.
+show_rx = true
+# Show the TX column.
+show_tx = true
+# Show event lines.
+show_evt = false
+# Hide calls that are already in the worked log.
+hide_worked = false
+# Color for calls that have never been worked.
+# Allowed: black, red, green, yellow, blue, magenta, cyan, gray, darkgray,
+#          lightred, lightgreen, lightyellow, lightblue, lightmagenta,
+#          lightcyan, white, reset, orange, purple
+color_new_call = "green"
+# Color for calls on a new Maidenhead grid.
+color_new_grid = "purple"
+# Color for calls on a new DXCC entity.
+color_new_dxcc = "red"
+# Color for the call currently being worked.
+color_working = "orange"
+# Color for calls already worked.
+color_worked = "gray"
+# Color for messages addressed to the local station in the right pane.
+color_rx_to_me = "darkgray"
+
+[qso]
+# Automatically answer any CQ when no other priority applies.
+auto_reply_cq = true
+# Automatically answer CQs on new Maidenhead grids.
+auto_reply_new_grid = true
+# Automatically answer CQs on new DXCC entities.
+# This outranks the new-grid rule when both apply.
+auto_reply_new_dxcc = true
+# Re-reply to calls already in the worked log.
+reply_b4 = false
+# CQ transmit parity. 0 = even slots, 1 = odd slots.
+cq_slot = 0
+# Max retries inside an active QSO before giving up.
+max_retries = 5
+# Idle receive slots before auto-CQ starts. 0 disables auto-CQ.
+idle_slots_before_cq = 0
+# Max CQ repetitions per CQ burst. Aliased as `auto_cq_attempts`.
+# Alias: auto_cq_attempts
+cq_max_retries = 10

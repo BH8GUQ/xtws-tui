@@ -1,6 +1,6 @@
 [package]
 name = "xtws-tui"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 description = "A Rust TUI terminal monitor for FT8/FT4 weak-signal decodes and QSO tracking"
 repository = "https://github.com/bh8guq/xtws-tui"
