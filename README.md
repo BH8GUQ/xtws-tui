@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.zh.md)
 
-XTWS-TUI is a Rust-based FT8/FT4 weak-signal digital mode terminal tools. It enables multi-platform FT8 / FT4 automation connectivity.
+XTWS-TUI is a Rust-based TUI terminal tool for sending and receiving FT8 / FT4 weak signal modes
 
 ## Features
 
