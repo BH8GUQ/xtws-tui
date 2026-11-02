@@ -2,8 +2,7 @@
 
 [English](README.md) | [中文](README.zh.md)
 
-XTWS-TUI 是一个基于 Rust 的 FT8 / FT4 弱信号数字模式终端监控工具，运行于 TUI 界面中。它可以监听音频输入、解码数字模式信号、跟踪已联系呼号与网格，并维护运行日志与 QSO 日志。
-
+XTWS-TUI 是一个基于 Rust 的 TUI 终端工具，用于发送和接收 FT8 / FT4 弱信号模式
 ## 功能概览
 
 - FT8 / FT4 音频采集与解码
