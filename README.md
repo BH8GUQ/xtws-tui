@@ -129,32 +129,35 @@ protocol = "ft8"
 ├── LICENSE
 ├── THIRD_PARTY_NOTICES.md
 ├── config/
-│   └── config.toml
-├── shell.nix
+│   ├── config.toml
+│   └── dxcc.txt
 ├── logs/
-├── src/
-│   ├── main.rs
-│   ├── domain/
-│   │   ├── mod.rs
-│   │   ├── config.rs
-│   │   ├── qso.rs
-│   │   └── worked.rs
-│   ├── infrastructure/
-│   │   ├── mod.rs
-│   │   ├── audio.rs
-│   │   ├── decode.rs
-│   │   ├── qso_log.rs
-│   │   ├── run_log.rs
-│   │   ├── signal.rs
-│   │   └── slot.rs
-│   └── presentation/
-│       ├── mod.rs
-│       └── ui/
-│           ├── mod.rs
-│           ├── feed.rs
-│           └── tui.rs
-├── target/
-└── logs/
+│   ├── qso/
+│   ├── run/
+│   ├── worked_calls.txt
+│   └── worked_grids.txt
+└── src/
+    ├── main.rs
+    ├── domain/
+    │   ├── mod.rs
+    │   ├── config.rs
+    │   ├── dxcc.rs
+    │   ├── qso.rs
+    │   └── worked.rs
+    ├── infrastructure/
+    │   ├── mod.rs
+    │   ├── audio.rs
+    │   ├── decode.rs
+    │   ├── qso_log.rs
+    │   ├── run_log.rs
+    │   ├── signal.rs
+    │   └── slot.rs
+    └── presentation/
+        ├── mod.rs
+        └── ui/
+            ├── mod.rs
+            ├── feed.rs
+            └── tui.rs
 ```
 
 ## Module Overview
