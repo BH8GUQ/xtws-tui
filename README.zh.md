@@ -3,6 +3,7 @@
 [English](README.md) | [中文](README.zh.md)
 
 XTWS-TUI 是一个基于 Rust 的 TUI 终端工具，用于发送和接收 FT8 / FT4 弱信号模式
+
 ## 功能概览
 
 - FT8 / FT4 音频采集与解码
